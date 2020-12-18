@@ -58,12 +58,22 @@ class HomeController extends BaseController {
   }
 
   async getEstimateETH() {
-
     const { daiNum } = this.ctx.query
     console.log('given dai number---', daiNum)
     const pair = await Fetcher.fetchPairData(WETH[DAI.chainId], DAI, provider)
     const [tokenAmount,] = pair.getInputAmount(new TokenAmount(DAI, ethers.utils.parseEther(daiNum).toString()))
     this.ok(tokenAmount.toSignificant(6))
+  }
+
+  async getMinimumAmountOut(){
+    const { ethNum } = this.ctx.query
+    console.log('given eth number---', ethNum)
+    const pair = await Fetcher.fetchPairData(DAI, WETH[DAI.chainId], provider)
+    const route = new Route([pair], WETH[DAI.chainId])
+    const trade = new Trade(route, new TokenAmount(WETH[DAI.chainId],  ethers.utils.parseEther(ethNum).toString()), TradeType.EXACT_INPUT)
+    const slippageTolerance = new Percent('50', '10000') //0.5%
+    const amountOutMin = trade.minimumAmountOut(slippageTolerance).toSignificant(6)
+    this.ok(amountOutMin)
   }
 
   async tradeETHforDAIs() {
