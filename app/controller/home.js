@@ -2,53 +2,106 @@
 
 const BaseController = require('./base');
 
-const UNISWAP = require('@uniswap/sdk');
-const { ChainId, Token, WETH, Fetcher, Trade, Route, TokenAmount, TradeType } = UNISWAP;
-const DAI = new Token(ChainId.MAINNET, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18)
+const { ethers } = require("ethers");
+const provider = ethers.getDefaultProvider('homestead', {
+  etherscan: '7PJM9WX71AEI9SF29XG318XMB9CE4JWMYP',
+  infura: '9a81acdff7f54d69863937a52f5e7244',
+  alchemy: 'Twy7aBeLRxo1wgCcDI4Bxs5t334nm0V0',
+  pocket: ''
+});
 
-const JSBI = require('jsbi');
+const UNISWAP = require('@uniswap/sdk');
+const { ChainId, Token, WETH, Fetcher, Trade, Route, TokenAmount, TradeType, JSBI, BigintIsh, Percent } = UNISWAP;
+const DAI = new Token(ChainId.MAINNET, '0x6B175474E89094C44Da98b954EedeAC495271d0F', 18);
+
+const UniV2Router02Address = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
+const UniV2Router02ABI = require('../abi/UniswapV2Router02.json');
+
+
 
 class HomeController extends BaseController {
-  async index() {
-    this.ok('Hello ok!');
-  }
+
 
   async getMidPrice() {
 
-    const pair = await Fetcher.fetchPairData(DAI, WETH[DAI.chainId])
+    const pair = await Fetcher.fetchPairData(DAI, WETH[DAI.chainId], provider)
     const route = new Route([pair], WETH[DAI.chainId])
 
     this.ok({
-      midPrice: route.midPrice.toSignificant(6),//642.18
+      midPrice: route.midPrice.toSignificant(6),//642.996
     })
 
   }
-
-  // async getExecPrice() {
-  //   const pair = await Fetcher.fetchPairData(DAI, WETH[DAI.chainId])
-  //   const route = new Route([pair], WETH[DAI.chainId])
-
-  //   const trade = new Trade(route, new TokenAmount(WETH[DAI.chainId], '1000000000000000000'), TradeType.EXACT_INPUT)
-
-  //   this.ok(trade.executionPrice.toSignificant(6))
-
-  // }
-
 
   async getPriceImpact() {
 
-    const pair = await Fetcher.fetchPairData(DAI, WETH[DAI.chainId])
+    const pair = await Fetcher.fetchPairData(DAI, WETH[DAI.chainId], provider)
     const route = new Route([pair], WETH[DAI.chainId])
+    console.log('midPrice---', route.midPrice.toSignificant(6))
     const trade = new Trade(route, new TokenAmount(WETH[DAI.chainId], '1000000000000000000'), TradeType.EXACT_INPUT)
-
-    const priceImpact = JSBI.subtract(trade.executionPrice.raw, route.midPrice.raw)
+    console.log('executionPrice---', trade.executionPrice.toSignificant(6))
+    const priceImpact = trade.executionPrice.raw.subtract(route.midPrice.raw)
     this.ok({
-      priceImpact: String(priceImpact)
+      priceImpact: priceImpact.toSignificant(6)
     })
 
   }
 
 
+  async getEstimateDAI() {
+
+    const { ethNum } = this.ctx.query
+    console.log('given eth number---', ethNum)
+    const pair = await Fetcher.fetchPairData(WETH[DAI.chainId], DAI, provider)
+    const [tokenAmount,] = pair.getOutputAmount(new TokenAmount(WETH[DAI.chainId], ethers.utils.parseEther(ethNum).toString()))
+    this.ok(tokenAmount.toSignificant(6))
+  }
+
+  async getEstimateETH() {
+
+    const { daiNum } = this.ctx.query
+    console.log('given dai number---', daiNum)
+    const pair = await Fetcher.fetchPairData(WETH[DAI.chainId], DAI, provider)
+    const [tokenAmount,] = pair.getInputAmount(new TokenAmount(DAI, ethers.utils.parseEther(daiNum).toString()))
+    this.ok(tokenAmount.toSignificant(6))
+  }
+
+  async tradeETHforDAIs() {
+    const pair = await Fetcher.fetchPairData(DAI, WETH[DAI.chainId], provider)
+    const route = new Route([pair], WETH[DAI.chainId])
+    const amountIn = '1000000000000000000' // 1 ETH
+    const trade = new Trade(route, new TokenAmount(WETH[DAI.chainId], amountIn), TradeType.EXACT_INPUT)
+
+    const slippageTolerance = new Percent('50', '10000') //0.5%
+    const amountOutMin = trade.minimumAmountOut(slippageTolerance).raw
+    const path = [WETH[DAI.chainId].address, DAI.address]
+    const to = '' // 这里填接收DAI的地址
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 20 // 20分钟
+    const value = trade.inputAmount.raw 
+
+    //初始化钱包
+    const mnemonicWallet = ethers.Wallet.fromMnemonic('');//仅供测试，正式使用需在app端导入
+    const wallet = mnemonicWallet.connect(provider);
+
+    //实例化合约
+    let uniV2Router = new ethers.Contract(
+      UniV2Router02Address,
+      UniV2Router02ABI,
+      provider
+    );
+
+    uniV2Router = uniV2Router.connect(wallet);
+
+    const overrides = {
+      value: value
+    };
+    //发起交易
+    uniV2Router.swapExactETHForTokens(amountOutMin, path, to, deadline, overrides).then(tx => {
+      console.log(tx)//tx.hash
+    })
+
+
+  }
 
 }
 

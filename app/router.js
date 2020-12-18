@@ -5,7 +5,10 @@
  */
 module.exports = app => {
   const { router, controller } = app;
-  router.get('/', controller.home.index);
+
   router.get('/getMidPrice', controller.home.getMidPrice);
   router.get('/getPriceImpact', controller.home.getPriceImpact);
+  router.get('/getEstimateDAI', controller.home.getEstimateDAI);
+  router.get('/getEstimateETH', controller.home.getEstimateETH);
+
 };
