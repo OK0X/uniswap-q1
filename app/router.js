@@ -12,5 +12,6 @@ module.exports = app => {
   router.get('/getPriceImpact', controller.home.getPriceImpact);
   router.get('/getMinimumAmountOut', controller.home.getMinimumAmountOut);
   router.get('/swapETHforDAI', controller.home.swapETHforDAI);
+  router.get('/swapDaiForETH', controller.home.swapDaiForETH);
 
 };
