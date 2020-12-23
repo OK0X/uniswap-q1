@@ -13,5 +13,5 @@ module.exports = app => {
   router.get('/getMinimumAmountOut', controller.home.getMinimumAmountOut);
   router.get('/swapETHforDAI', controller.home.swapETHforDAI);
   router.get('/swapDaiForETH', controller.home.swapDaiForETH);
-
+  router.get('/getbestTradeExactIn', controller.home.getbestTradeExactIn);
 };
